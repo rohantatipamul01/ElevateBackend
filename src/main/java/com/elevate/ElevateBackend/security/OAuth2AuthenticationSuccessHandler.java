@@ -39,58 +39,109 @@ public class OAuth2AuthenticationSuccessHandler
             Authentication authentication)
             throws IOException, ServletException {
 
-        Object principal = authentication.getPrincipal();
+        try {
 
-        User user;
+            System.out.println("========================================");
+            System.out.println("OAUTH2 SUCCESS HANDLER STARTED");
+            System.out.println("========================================");
 
-        if (principal instanceof CustomOAuthUser customUser) {
+            Object principal = authentication.getPrincipal();
 
-            user = customUser.getUser();
+            System.out.println("Principal Class : "
+                    + principal.getClass().getName());
 
-        } else if (principal instanceof OidcUser oidcUser) {
+            User user;
 
-            String email = oidcUser.getEmail();
+            if (principal instanceof CustomOAuthUser customUser) {
 
-            user = userRepository.findByEmail(email)
-                    .orElseThrow(() ->
-                            new RuntimeException("User not found: " + email));
+                user = customUser.getUser();
 
-        } else if (principal instanceof OAuth2User oauth2User) {
+                System.out.println("Authenticated using CustomOAuthUser");
 
-            String email = oauth2User.getAttribute("email");
+            } else if (principal instanceof OidcUser oidcUser) {
 
-            user = userRepository.findByEmail(email)
-                    .orElseThrow(() ->
-                            new RuntimeException("User not found: " + email));
+                String email = oidcUser.getEmail();
 
-        } else {
+                System.out.println("OIDC Email : " + email);
 
-            throw new RuntimeException(
-                    "Unsupported principal type: "
-                            + principal.getClass().getName());
+                user = userRepository.findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found : " + email));
+
+            } else if (principal instanceof OAuth2User oauth2User) {
+
+                String email = oauth2User.getAttribute("email");
+
+                System.out.println("OAuth2 Email : " + email);
+
+                user = userRepository.findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "User not found : " + email));
+
+            } else {
+
+                throw new RuntimeException(
+                        "Unsupported Principal : "
+                                + principal.getClass().getName());
+            }
+
+            System.out.println("----------------------------------------");
+            System.out.println("User Found Successfully");
+            System.out.println("ID        : " + user.getId());
+            System.out.println("Full Name : " + user.getFullName());
+            System.out.println("Username  : " + user.getUsername());
+            System.out.println("Email     : " + user.getEmail());
+            System.out.println("----------------------------------------");
+
+            String token = jwtUtil.generateToken(user.getEmail());
+
+            System.out.println("JWT Generated Successfully");
+
+            String redirectUrl =
+                    "http://localhost:5173/oauth/success"
+                            + "?token=" + encode(token)
+                            + "&id=" + user.getId()
+                            + "&fullName=" + encode(user.getFullName())
+                            + "&username=" + encode(user.getUsername())
+                            + "&email=" + encode(user.getEmail())
+                            + "&image=" + encode(
+                                    user.getProfileImage() == null
+                                            ? ""
+                                            : user.getProfileImage());
+
+            System.out.println("Redirect URL :");
+            System.out.println(redirectUrl);
+
+            System.out.println("Redirecting...");
+
+            getRedirectStrategy().sendRedirect(
+                    request,
+                    response,
+                    redirectUrl);
+
+            System.out.println("Redirect Completed");
+
+        } catch (Exception e) {
+
+            System.out.println("========================================");
+            System.out.println("OAUTH2 ERROR OCCURRED");
+            System.out.println("========================================");
+
+            e.printStackTrace();
+
+            System.out.println("========================================");
+
+            throw e;
         }
-
-        String token = jwtUtil.generateToken(user.getEmail());
-
-        String redirectUrl =
-                "http://localhost:5173/oauth/success"
-                        + "?token=" + encode(token)
-                        + "&id=" + user.getId()
-                        + "&fullName=" + encode(user.getFullName())
-                        + "&username=" + encode(user.getUsername())
-                        + "&email=" + encode(user.getEmail())
-                        + "&image=" + encode(
-                                user.getProfileImage() == null
-                                        ? ""
-                                        : user.getProfileImage());
-
-        getRedirectStrategy().sendRedirect(
-                request,
-                response,
-                redirectUrl);
     }
 
     private String encode(String value) {
+
+        if (value == null) {
+            return "";
+        }
 
         return URLEncoder.encode(
                 value,
