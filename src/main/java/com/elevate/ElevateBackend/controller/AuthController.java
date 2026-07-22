@@ -18,7 +18,6 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/auth")
 @Validated
-@CrossOrigin(origins = "http://localhost:5173")
 public class AuthController {
 
     private final UserService userService;
@@ -40,10 +39,10 @@ public class AuthController {
                 HttpStatus.CREATED
         );
     }
-    @PostMapping("/login")
-    public ResponseEntity<JwtResponse> login(@RequestBody LoginRequest request) {
 
-        System.out.println("========== LOGIN API HIT ==========");
+    @PostMapping("/login")
+    public ResponseEntity<JwtResponse> login(
+            @RequestBody LoginRequest request) {
 
         User user = userService.login(request);
 

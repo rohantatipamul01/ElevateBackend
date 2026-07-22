@@ -4,17 +4,12 @@ import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-
-
-
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -27,9 +22,7 @@ import com.elevate.ElevateBackend.security.OAuth2AuthenticationSuccessHandler;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtFilter;
-
     private final CustomOAuth2UserService customOAuth2UserService;
-
     private final OAuth2AuthenticationSuccessHandler successHandler;
 
     public SecurityConfig(
@@ -42,8 +35,6 @@ public class SecurityConfig {
         this.successHandler = successHandler;
     }
 
-    
-
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration configuration)
@@ -53,23 +44,18 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http)
+    public SecurityFilterChain securityFilterChain(HttpSecurity http)
             throws Exception {
 
         http
                 .csrf(csrf -> csrf.disable())
 
-                .cors(cors ->
-                        cors.configurationSource(
-                                corsConfigurationSource()))
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
                 .sessionManagement(session ->
-                        session.sessionCreationPolicy(
-                                SessionCreationPolicy.IF_REQUIRED))
+                        session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
 
                 .authorizeHttpRequests(auth -> auth
-
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/oauth2/**",
@@ -81,11 +67,8 @@ public class SecurityConfig {
                         .authenticated())
 
                 .oauth2Login(oauth -> oauth
-
                         .userInfoEndpoint(userInfo ->
-                                userInfo.userService(
-                                        customOAuth2UserService))
-
+                                userInfo.userService(customOAuth2UserService))
                         .successHandler(successHandler))
 
                 .addFilterBefore(
@@ -98,12 +81,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
 
-        CorsConfiguration configuration =
-                new CorsConfiguration();
+        CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
-                "https://your-vercel-app.vercel.app"
+                "https://elevate-frontend-eosin.vercel.app"
         ));
 
         configuration.setAllowedMethods(List.of(
@@ -111,7 +93,8 @@ public class SecurityConfig {
                 "POST",
                 "PUT",
                 "DELETE",
-                "OPTIONS"));
+                "OPTIONS"
+        ));
 
         configuration.setAllowedHeaders(List.of("*"));
 
@@ -120,9 +103,7 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
 
-        source.registerCorsConfiguration(
-                "/**",
-                configuration);
+        source.registerCorsConfiguration("/**", configuration);
 
         return source;
     }
