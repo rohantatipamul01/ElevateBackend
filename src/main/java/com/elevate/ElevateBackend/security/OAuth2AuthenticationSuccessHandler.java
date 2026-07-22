@@ -3,13 +3,17 @@ package com.elevate.ElevateBackend.security;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
+import com.elevate.ElevateBackend.entity.AuthProvider;
+import com.elevate.ElevateBackend.entity.Role;
 import com.elevate.ElevateBackend.entity.User;
 import com.elevate.ElevateBackend.repository.UserRepository;
 
@@ -23,13 +27,16 @@ public class OAuth2AuthenticationSuccessHandler
 
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public OAuth2AuthenticationSuccessHandler(
             JwtUtil jwtUtil,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder) {
 
         this.jwtUtil = jwtUtil;
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -39,102 +46,98 @@ public class OAuth2AuthenticationSuccessHandler
             Authentication authentication)
             throws IOException, ServletException {
 
-        try {
+        User user;
 
-            System.out.println("========================================");
-            System.out.println("OAUTH2 SUCCESS HANDLER STARTED");
-            System.out.println("========================================");
+        Object principal = authentication.getPrincipal();
 
-            Object principal = authentication.getPrincipal();
+        if (principal instanceof CustomOAuthUser customOAuthUser) {
 
-            System.out.println("Principal Class : "
-                    + principal.getClass().getName());
+            user = customOAuthUser.getUser();
 
-            User user;
+        } else if (principal instanceof OidcUser oidcUser) {
 
-            if (principal instanceof CustomOAuthUser customUser) {
+            user = getOrCreateUser(
+                    oidcUser.getEmail(),
+                    oidcUser.getFullName(),
+                    oidcUser.getPicture());
 
-                user = customUser.getUser();
+        } else if (principal instanceof OAuth2User oauth2User) {
 
-                System.out.println("Authenticated using CustomOAuthUser");
+            String email = oauth2User.getAttribute("email");
+            String name = oauth2User.getAttribute("name");
+            String picture = oauth2User.getAttribute("picture");
 
-            } else if (principal instanceof OidcUser oidcUser) {
+            user = getOrCreateUser(email, name, picture);
 
-                String email = oidcUser.getEmail();
+        } else {
 
-                System.out.println("OIDC Email : " + email);
-
-                user = userRepository.findByEmail(email)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "User not found : " + email));
-
-            } else if (principal instanceof OAuth2User oauth2User) {
-
-                String email = oauth2User.getAttribute("email");
-
-                System.out.println("OAuth2 Email : " + email);
-
-                user = userRepository.findByEmail(email)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "User not found : " + email));
-
-            } else {
-
-                throw new RuntimeException(
-                        "Unsupported Principal : "
-                                + principal.getClass().getName());
-            }
-
-            System.out.println("----------------------------------------");
-            System.out.println("User Found Successfully");
-            System.out.println("ID        : " + user.getId());
-            System.out.println("Full Name : " + user.getFullName());
-            System.out.println("Username  : " + user.getUsername());
-            System.out.println("Email     : " + user.getEmail());
-            System.out.println("----------------------------------------");
-
-            String token = jwtUtil.generateToken(user.getEmail());
-
-            System.out.println("JWT Generated Successfully");
-
-            String redirectUrl =
-                    "http://localhost:5173/oauth/success"
-                            + "?token=" + encode(token)
-                            + "&id=" + user.getId()
-                            + "&fullName=" + encode(user.getFullName())
-                            + "&username=" + encode(user.getUsername())
-                            + "&email=" + encode(user.getEmail())
-                            + "&image=" + encode(
-                                    user.getProfileImage() == null
-                                            ? ""
-                                            : user.getProfileImage());
-
-            System.out.println("Redirect URL :");
-            System.out.println(redirectUrl);
-
-            System.out.println("Redirecting...");
-
-            getRedirectStrategy().sendRedirect(
-                    request,
-                    response,
-                    redirectUrl);
-
-            System.out.println("Redirect Completed");
-
-        } catch (Exception e) {
-
-            System.out.println("========================================");
-            System.out.println("OAUTH2 ERROR OCCURRED");
-            System.out.println("========================================");
-
-            e.printStackTrace();
-
-            System.out.println("========================================");
-
-            throw e;
+            throw new RuntimeException(
+                    "Unsupported principal type : "
+                            + principal.getClass().getName());
         }
+
+        String token = jwtUtil.generateToken(user.getEmail());
+
+        String redirectUrl =
+                "http://localhost:5173/oauth/success"
+                        + "?token=" + encode(token)
+                        + "&id=" + user.getId()
+                        + "&fullName=" + encode(user.getFullName())
+                        + "&username=" + encode(user.getUsername())
+                        + "&email=" + encode(user.getEmail())
+                        + "&image=" + encode(
+                                user.getProfileImage() == null
+                                        ? ""
+                                        : user.getProfileImage());
+
+        getRedirectStrategy().sendRedirect(
+                request,
+                response,
+                redirectUrl);
+    }
+
+    private User getOrCreateUser(
+            String email,
+            String fullName,
+            String picture) {
+
+        return userRepository.findByEmail(email)
+                .orElseGet(() -> {
+
+                    User user = new User();
+
+                    user.setEmail(email);
+
+                    user.setFullName(
+                            fullName == null || fullName.isBlank()
+                                    ? "User"
+                                    : fullName);
+
+                    String username =
+                            email.substring(0, email.indexOf("@"));
+
+                    String finalUsername = username;
+                    int i = 1;
+
+                    while (userRepository.findByUsername(finalUsername).isPresent()) {
+                        finalUsername = username + i;
+                        i++;
+                    }
+
+                    user.setUsername(finalUsername);
+
+                    user.setPassword(
+                            passwordEncoder.encode(
+                                    UUID.randomUUID().toString()));
+
+                    user.setRole(Role.USER);
+
+                    user.setProvider(AuthProvider.GOOGLE);
+
+                    user.setProfileImage(picture);
+
+                    return userRepository.save(user);
+                });
     }
 
     private String encode(String value) {
