@@ -79,7 +79,7 @@ public class OAuth2AuthenticationSuccessHandler
         String token = jwtUtil.generateToken(user.getEmail());
 
         String redirectUrl =
-                "http://localhost:5173/oauth/success"
+                "https://elevate-frontend-eosin.vercel.app/oauth/success"
                         + "?token=" + encode(token)
                         + "&id=" + user.getId()
                         + "&fullName=" + encode(user.getFullName())
