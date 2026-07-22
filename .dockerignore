@@ -1,0 +1,12 @@
+target
+.git
+.gitignore
+.idea
+.vscode
+.settings
+.project
+.classpath
+.mvn/wrapper/maven-wrapper.jar
+README.md
+*.log
+logs
